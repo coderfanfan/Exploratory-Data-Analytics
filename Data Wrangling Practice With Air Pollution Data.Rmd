@@ -1,0 +1,348 @@
+---
+title: "Data Wrangling Practice With Chicago Air Pollution Data"
+author: "Yurong Fan"
+output: html_document
+---
+
+##1. Load the dataset `chicago.rds` 
+```{r}
+chicago = readRDS("chicago.rds")
+```
+
+##2. Data Cleaning
+
+Import related libraries and convert dataset to tbl dataframe before start.
+```{r, echo = FALSE, include= FALSE}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+chicago <- tbl_df(chicago)
+```
+
+###Clearning missing values
+
+I first summarized the number of missing data for each attributes. The result below shows pm25tmean2 contains 4447 cases of missing data which makes 64% of its total records. the other attributes contains missing data which makes equal or less than 3% of total records. 
+
+**So for the sake of simplicity, I assume the attributes containing less than 3% missing data are missing completely at random and omit rows with their missing data for later analysis.**
+
+**Total numbers of missing values**
+```{r}
+sapply(chicago, function(x) sum(is.na(x)))
+```
+
+**Proportion of total rows of missing values**
+```{r}
+sapply(chicago, function(x) round(sum(is.na(x))/nrow(chicago),2))
+```
+
+For PM2.5, I made a plot to further identify the pattern of its missing values. The plot shows that there is no value of PM2.5 for years before 1998, and larege amounts of PM2.5 data missing in year 1998 and 1999. Since year 2000, PM2.5 seems to contain little missing data. 
+```{r}
+ggplot(chicago,aes(x=date, y=pm25tmean2)) + geom_line(size = 0.01, color = "blue")
+```
+
+I further summarized the proportion of missing values to confirm my observations. 
+In years since 2000, there are only 3% missing values in PM2.5.However year 1998 and 1999 contain 29% and 72% respectively of PM2.5 missing data. Including PM2.5 data before year 2000 is highly possbile to introduce bias when making PM2.5 by year analysis. **To keep consistency, I only used data since year 2000 for any analysis related to PM2.5 and assmued its 3% PM2.5 missing values are missing completely at random thus omitting rows with them for the sake of simplicity**.
+
+
+**Proportion of total rows containing missing data for the subset of data since year 2000**
+```{r}
+filter(chicago, date >= as.Date("2000-01-01")) %>%
+sapply(function(x)round(sum(is.na(x))/nrow(filter(chicago, date >= as.Date("2000-01-01"))),2))
+```
+
+**Proportion of total rows containing missing data for the data in year 1998**
+```{r}
+filter(chicago, date >= as.Date("1998-01-01") & date < as.Date("1999-01-01")) %>%
+sapply(function(x)round(sum(is.na(x))/nrow(filter(chicago, date >= as.Date("1998-01-01") & date < as.Date("1999-01-01"))),2))
+```
+
+**Proportion of total rows containing missing data for the data in year 1999**
+```{r}
+filter(chicago, date >= as.Date("1999-01-01") & date < as.Date("2000-01-01")) %>%
+sapply(function(x)round(sum(is.na(x))/nrow(filter(chicago, date >= as.Date("1999-01-01") & date < as.Date("2000-01-01"))),2))
+```
+
+###cleaning outliers
+I plotted the boxplot to identify outliers of each factor and also used density plot to exclude "outliers" that are probably tail data from skewed distributions. 
+
+> TMPD Outlier Cleaning
+
+For tmpd, the only plot below whisker is not far away and is probably data from the left tail of the left skewed tmpd sample distribution.**I will assume the population of tmpd also follows left skewed distribution thus will not recognize it as outlier.** 
+```{r}
+g1 <- ggplot(chicago,aes(x=factor(0), y=tmpd)) + geom_boxplot() + labs(title = "tmpd boxplot", x = "tmpd", y = "boxplot")
+g2 <- ggplot(chicago,aes(tmpd)) + geom_density() + labs(title = "tmpd density plot", x = "tmpd", y = "density")
+grid.arrange(g1,g2,ncol = 2)
+```
+
+> DPTP Outlier Cleaning
+
+For dptp, the points below whisker in the box plot are probably data from the left tail of the left skewed dptp sample distribution.**I will assume the population of dptp also follows left skewed distribution thus will not recognize them as outliers.** 
+```{r}
+g3 <- ggplot(chicago,aes(x=factor(0), y=dptp)) + geom_boxplot() + labs(title = "dptp boxplot", x = "dptp", y = "boxplot")
+g4 <- ggplot(chicago,aes(dptp)) + geom_density() + labs(title = "dptp density plot", x = "dptp", y = "density")
+grid.arrange(g3,g4,ncol = 2)
+```
+
+> PM2.5 Outlier Cleaning
+
+For PM2.5, the points above whisker in the box plot are probably data from the right tail of the right skewed PM2.5 sample distribution.**I will assume the population of PM2.5 also follows right skewed distribution thus will not recognize them as outliers.** 
+```{r}
+g5 <- ggplot(chicago,aes(x=factor(0), y=pm25tmean2)) + geom_boxplot() + labs(title = "PM2.5 boxplot", x = "PM2.5", y = "boxplot")
+g6 <- ggplot(chicago,aes(pm25tmean2)) + geom_density() + labs(title = "PM2.5 density plot", x = "PM2.5", y = "density")
+grid.arrange(g5,g6,ncol = 2)
+```
+
+> PM10 Outlier Cleaning
+
+**For PM10, the highest two points are far away from the others in the box plot, I will recognize them as an outliner and replace with NA.** Other points above whisker are probably data from the right tail of the right skewed PM10 sample distribution.**I will assume the population of PM10 is also right skewed thus will not recognize them as outliers.** 
+```{r}
+g7 <- ggplot(chicago,aes(x=factor(0), y=pm10tmean2)) + geom_boxplot() + labs(title = "PM10 boxplot", x = "PM10", y = "boxplot")
+g8 <- ggplot(chicago,aes(pm10tmean2)) + geom_density() + labs(title = "PM10 density plot", x = "PM10", y = "density")
+grid.arrange(g7,g8,ncol = 2)
+```
+
+> Ozone (O3) Outlier Cleaning
+
+For O3, the points above whisker in the box plot are probably data from the right tail of the right skewed O3 sample distribution.**I will assume the population of O3 also follows right skewed distribution thus will not recognize them as outliers.** 
+```{r}
+g9 <- ggplot(chicago,aes(x=factor(0), y=o3tmean2)) + geom_boxplot() + labs(title = "O3 boxplot", x = "O3", y = "boxplot")
+g10 <- ggplot(chicago,aes(o3tmean2)) + geom_density() + labs(title = "O3 density plot", x = "O3", y = "density")
+grid.arrange(g9,g10,ncol = 2)
+```
+
+> NO2 Outlier Cleaning
+
+For NO2, the points above whisker in the box plot are probably data from the right tail of the right skewed NO2 sample distribution.**I will assume the population of NO2 also follows right skewed distribution thus will not recognize them as outliers.** 
+```{r}
+g11 <- ggplot(chicago,aes(x=factor(0), y=no2tmean2)) + geom_boxplot() + labs(title = "NO2 boxplot", x = "NO2", y = "boxplot")
+g12 <- ggplot(chicago,aes(no2tmean2)) + geom_density() + labs(title = "NO2 density plot", x = "NO2", y = "density")
+grid.arrange(g11,g12,ncol = 2)
+```
+
+> Replace Outliers with NA
+
+Replace detected two outliers in PM10 with NA. 
+```{r,echo=FALSE}
+chicago[chicago$pm10tmean2 == max(chicago$pm10tmean2,na.rm = TRUE) & !is.na(chicago$pm10tmean2),]$pm10tmean2 = NA
+
+chicago[chicago$pm10tmean2 == max(chicago$pm10tmean2,na.rm = TRUE) & !is.na(chicago$pm10tmean2),]$pm10tmean2 = NA
+
+```
+
+Name subset of data of year 2000 and after as "chicago_since2000" for analysis related with PM2.5.
+```{r, echo=FALSE}
+chicago_since2000 = filter(chicago, date >= as.Date("2000-01-01")) 
+```
+
+
+## 3. Extracting rows with high PM2.5
+
+Below is the density plot of PM2.5 values in years from 2000 to 2005 with quantile lines over it. The distribution of PM2.5 is right skewed 
+```{r}
+ggplot(chicago_since2000, aes(x=pm25tmean2)) + geom_density(fill = "blue", alpha = 0.3) + geom_vline(xintercept=quantile(chicago_since2000$pm25tmean2,na.rm = TRUE), linetype = 2, color = 'brown3')  
+```
+
+**To understand those rows with high PM2.5 values, I extracted the  rows with PM2.5 values above 75% quantile.**The extraction was done by adding a label column.
+```{r, echo = FALSE}
+quantile0.75 <- quantile(chicago_since2000$pm25tmean2,na.rm = TRUE)[4]
+
+subset_above <- chicago_since2000$pm25tmean2 >= quantile0.75 & !is.na(chicago_since2000$pm25tmean2)
+subset_below <- chicago_since2000$pm25tmean2 < quantile0.75 & !is.na(chicago_since2000$pm25tmean2)
+
+chicago_since2000 <- mutate(chicago_since2000, PM2.5_0.75quantile = NA)
+chicago_since2000[subset_above,]$PM2.5_0.75quantile <- "Above"
+chicago_since2000[subset_below,]$PM2.5_0.75quantile <- "Below"
+chicago_since2000$PM2.5_0.75quantile <- factor(chicago_since2000$PM2.5_0.75quantile)
+```
+
+As discussed in the cleaning missing data part, I omitted rows containing missing values of PM2.5 for the subset of records from 2000 to 2005.
+```{r, echo=FALSE}
+chicago_since2000 <- filter(chicago_since2000, !is.na(chicago_since2000$pm25tmean2))
+```
+
+The PM2.5 of Chicago reached its highest 10 values in below 10 days from 2000 to 2005.
+```{r}
+arrange(chicago_since2000, desc(pm25tmean2))%>%
+  head(10)
+```
+
+## 4. Analysing the relationship between high PM2.5 and other pollutants
+
+I further explored the subset of days with PM2.5 level above its 75% quantile to see if other pollutants were linked to high PM2.5.
+
+> PM10 Level 
+
+**From the box plot and scatter plot with fitted smooth line below,  it is clear that when PM2.5 is higher, the PM10 is generally also higher in Chicago. **
+```{r}
+g13 <- ggplot(chicago_since2000, aes(PM2.5_0.75quantile, y = pm10tmean2)) + geom_boxplot() + labs(x = 'PM2.5 above or below 75% quantile',y = 'PM10 level')
+
+g14<- ggplot(chicago_since2000, aes(x=pm10tmean2,y=pm25tmean2)) + geom_smooth()+geom_point(alpha = 0.3, size = 0.1) + labs(x = "PM10 level", y = "PM2.5 level")
+
+grid.arrange(g13,g14, ncol = 2)
+```
+
+> Ozone Level
+
+**The relationship between Ozone(O3) and PM2.5 showed on the scatter plot follows a U shape.There are much less points on the right side of the U shape. In most occassions higher level of PM2.5 is related with less Ozone.**
+```{r}
+g15 <- ggplot(chicago_since2000, aes(x = PM2.5_0.75quantile, y = o3tmean2)) + geom_boxplot() + labs(x = 'PM2.5 above or below 75% quantile',y = 'O3 level')
+
+g16<- ggplot(chicago_since2000, aes(x=o3tmean2, y=pm25tmean2)) + geom_smooth()+geom_point(alpha = 0.3, size = 0.1) + labs(x = "O3 level", y = "PM2.5 level")
+
+grid.arrange(g15,g16, ncol = 2)
+```
+
+>  Nitrogen Dioxide (No2) Level 
+
+**The level of PM2.5 is also possitive related with the level of NO2 in Chicago.**
+```{r}
+g17 <- ggplot(chicago_since2000, aes(y=no2tmean2, x = PM2.5_0.75quantile)) + geom_boxplot() + labs(x = 'PM2.5 above or below 75% quantile',y = 'NO2 level')
+
+g18<- ggplot(chicago_since2000, aes(x=no2tmean2, y=pm25tmean2)) + geom_smooth()+geom_point(alpha = 0.3, size = 0.1) + labs(x = "NO2 level", y = "PM2.5 level")
+
+grid.arrange(g17,g18, ncol = 2)
+```
+
+> TMPD
+
+**There is little relationship between tmpd and PM2.5.**
+```{r}
+g19 <- ggplot(chicago_since2000, aes(y=tmpd, x = PM2.5_0.75quantile)) + geom_boxplot() + labs(x = 'PM2.5 above or below 75% quantile',y = 'tmpd')
+
+g20 <- ggplot(chicago_since2000, aes(x=tmpd, y=pm25tmean2)) + geom_smooth()+geom_point(alpha = 0.3, size = 0.1) + labs(x = "tmpd", y = "PM2.5 level")
+
+grid.arrange(g19,g20, ncol = 2)
+```
+
+> DPTP
+
+**Similar to tmpd, there is also little relationship between DPTP and PM2.5**
+```{r}
+g21 <- ggplot(chicago_since2000, aes(y=dptp, x = PM2.5_0.75quantile)) + geom_boxplot() + labs(x = 'PM2.5 above or below 75% quantile',y = 'dptp')
+
+g22 <- ggplot(chicago_since2000, aes(x=dptp, y=pm25tmean2)) + geom_smooth()+geom_point(alpha = 0.3, size = 0.1) + labs(x = "dptp", y = "PM2.5 level")
+
+grid.arrange(g21,g22, ncol = 2)
+```
+
+##5. Normalization
+
+**Create one column with z-score normalized PM2.5 values**
+```{r}
+pm25mean <- mean(chicago_since2000$pm25tmean2)
+pm25std <- sd(chicago_since2000$pm25tmean2)
+chicago_since2000$pm25Norm <- (chicago_since2000$pm25tmean2 - pm25mean)/pm25std
+```
+
+**Create another column with min-max normalized PM10 values**
+```{r}
+pm10min <- min(chicago_since2000$pm10tmean2)
+pm10max <- max(chicago_since2000$pm10tmean2)
+chicago_since2000$pm10Norm <- (chicago_since2000$pm10tmean2 - pm10min)/(pm10max - pm10min)
+```
+
+##6. Adding Year column
+
+```{r}
+year = as.POSIXlt(chicago$date)$year + 1900
+chicago$year = year
+
+year_since2000 = as.POSIXlt(chicago_since2000$date)$year + 1900
+chicago_since2000$year = year_since2000
+```
+
+##7. Key summary statistics of the pollutants by year 
+
+###Polutants except PM2.5
+As discussed in missing data cleaning part, by year analysis of PM2.5 for years before 2000 will probably be biased due to large proportion of missing data. I will use subset of data since year 2000 for PM2.5 later. 
+
+> By year mean of pollutants except PM2.5
+
+```{r}
+group_by(chicago, year) %>%
+  summarise(AvgPM10 = mean(pm10tmean2,na.rm = TRUE), 
+            AvgO3 = mean(o3tmean2, na.rm = TRUE),
+            AvgNO2 = mean(no2tmean2, na.rm = TRUE),
+            Avgtmpd = mean(tmpd, na.rm = TRUE),
+            Avgdptp = mean(dptp, na.rm = TRUE))
+```
+**Above mean summary shows the average PM10 level in Chicago decreased from 1987 to 2005.While other pollutants fluctuated around a relatively fixed level.**
+
+> By year standard deviation of pollutants except PM2.5
+
+```{r}
+group_by(chicago, year) %>%
+  summarise(stdPM10 = sd(pm10tmean2,na.rm = TRUE), 
+            stdO3 = sd(o3tmean2, na.rm = TRUE),
+            stdNO2 = sd(no2tmean2, na.rm = TRUE),
+            stdtmpd = sd(tmpd, na.rm = TRUE),
+            stddptp = sd(dptp, na.rm = TRUE))
+```
+
+**Above standard deviation summary shows the flunctuation of daily PM10 records followed a decreasing trend from 1987 to 2005. While the daily flunctuation of other pollutants remained at a relatively stable level.**
+
+> By year minimum level of pollutants except PM2.5
+
+```{r}
+group_by(chicago, year) %>%
+  summarise(minPM10 = min(pm10tmean2,na.rm = TRUE), 
+            minO3 = min(o3tmean2, na.rm = TRUE),
+            minNO2 = min(no2tmean2, na.rm = TRUE),
+            mintmpd = min(tmpd, na.rm = TRUE),
+            mindptp = min(dptp, na.rm = TRUE))
+```
+
+**The minimum level of PM10 in Chicago also followed a reducing trend from 1987 to 2005. There are some extremely lower values for tmpd and dptp in year 1994 and 1996.**
+
+> By year maximum value of pollutants except PM2.5
+
+```{r}
+group_by(chicago, year) %>%
+  summarise(maxPM10 = max(pm10tmean2,na.rm = TRUE), 
+            maxO3 = max(o3tmean2, na.rm = TRUE),
+            maxNO2 = max(no2tmean2, na.rm = TRUE),
+            maxtmpd = max(tmpd, na.rm = TRUE),
+            maxdptp = max(dptp, na.rm = TRUE))
+
+```
+
+**The maximum level of all pollutants except dptp reduced from 1987 to 2005. From this perspective, Chicago did a good job in controlling extreme high levels of pollutants.**
+
+### By Year summary of PM2.5 
+```{r}
+group_by(chicago_since2000, year) %>%
+  summarise(meanPM2.5 = mean(pm25tmean2,na.rm = TRUE), 
+            stdPM2.5 = sd(pm25tmean2, na.rm = TRUE),
+            maxPM2.5 = max(pm25tmean2, na.rm = TRUE),
+            minPM2.5 = min(pm25tmean2, na.rm = TRUE))
+```
+**For PM2.5, although it yearly average level remained relatively stable from 2000 to 2005, the maximum level climbed from 47 in 2000 to 61 in 2005 which threated Chicago environment.**
+
+##8. Average levels of Ozone (o3) within quintiles of PM25
+
+```{r, echo=FALSE}
+brks = quantile(chicago_since2000$pm25tmean2)
+chicago_since2000$pm25.quint <- cut(chicago_since2000$pm25tmean2, breaks = brks, labels = c(1,2,3,4))
+```
+
+```{r}
+o3_pm25 = subset(chicago_since2000, !is.na(pm25.quint)) %>%
+  group_by(pm25.quint) %>%
+  summarise(AvgO3 = mean(o3tmean2, na.rm = TRUE)) 
+
+ggplot(o3_pm25, aes(x = pm25.quint, y = AvgO3)) + geom_bar(stat="identity", width = 0.2, fill = "skyblue") + geom_text(aes(label= round(AvgO3,2))) 
+```
+
+**Above chart shows the average level of Ozone is higher for PM2.5 within lower quantiles. Thus reducing the level of PM2.5 can help protecting Ozone.**
+
+## Summary
+
+**In summary, among all pollutants analysed, PM2.5 has a climbing trend from 2000 to 2005 in Chicago through increasing higher extreme. Besides its own damage to Chicago environment, higher PM2.5 is also related with the damage of Ozone. Thus, preventing the release of PM2.5 becomes a priority for Chicago pollutants management. From the analysis, higher level of PM2.5 is largely correlated with higher level of NO2 and PM10. Thus it is hard to control PM2.5 without controlling the release of NO2 and PM10.**
+
+
+
+
+
+
+
+
