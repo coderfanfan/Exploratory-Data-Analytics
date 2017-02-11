@@ -1,0 +1,339 @@
+---
+title: "Understand how keyword contextual ambiguity will affect search advertising efficiency using topic modeling"
+author: "Yurong Fan"
+date: "2016-11-08"
+output: html_document
+---
+
+```{r setup,cache = TRUE}
+library(magrittr) 
+library(dplyr)
+library(ggplot2)
+```
+
+
+## Goal 
+
+The goal of this analysis is to explore how various features effect consumer search behavior. Above
+this, you will understand the interplay between a keyword's context and consumers' search behavior. More
+specifically, you will need to ascertain how the breadth of a keyword's context might affect consumer
+behavior and keyword performance. In reality, keyword contextual ambiguity can result in both higher
+diversity in ad quality and higher probability of ad irrelevancy. Therefore, how keyword contextual
+ambiguity would affect consumer click behavior is unclear. To explore this question, you are going to use a
+rich dataset from a major search engine to perform a cross-category analysis and examine which of these two
+opposing effects dominates in the context of search advertising.
+
+## Understanding the data 
+
+The keyword level variables are in `keywords.csv`, with the following data dictionary
+
+| Field | Description |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| num_ads | measures the total number of ads produced for a particular keyword | 
+| num_clicks | measures the total number of clicks a particular keyword receives | 
+| num_impressions | denotes the total number of times consumers search for a particular keyword in the dataset | 
+| num_word | denotes the number of words in the keyword |
+| brand | does the keyword refer to a specific brand |
+| location | does the keyword refer to a specific location |
+| log_trans | a measure of transactional intent, measured by the natural log of the frequency of transactional words that appear in the organic results for this keyword |
+| avg_ad_quality | the average quality of ads shown for this keyword, where the quality of an ad is the average click through rate that the ad receives for other keywords |
+| avg_num_ads | measures the average number of competing advertisers during an impression, which denotes the competitive intensity for a keyword |
+|categoryid | id indicating the keyword's product category |
+
+Additionally, the folder `organic_text` contains a file for each keyword. Each file contains the title and
+textual content of the brief description of the top-50-ranked Google organic search results for the given
+keyword. This text is meant to be a reasonable approximation of text representing the contextual meaning(s)
+of each keyword.
+
+Open the `keywords.csv` data in R 
+
+```{r} 
+folder="E:/MSBA/6410 Exploratory Data Analytics and Visualization/HW/HW 3"
+setwd(folder) 
+kw = read.csv("keywords.csv")
+```
+
+## Exploratory analysis of relationships between CTR and different factors
+```{r}
+## Calcuate click through rate 
+library(dplyr)
+kw = mutate(kw, ctr = num_clicks/num_impressions)
+```
+
+**Through exploring the distribution of each variables and the relationship between click through rate and other variables. We can find two interesting relations:**
+**1. Click through rate is positively related with ads quality.**
+**2. Click through rate is negatively related with num_ads.And the relation is curvilinear.**
+**3. Click through rate varies by categoryid**
+**Other variables such as whether the keyword referes to brand, whether the keyword refers to location do not have obvious relationship with click through rate.**
+```{r} 
+library(ggplot2)
+# key words click through rate 
+##distribution
+ggplot(kw, aes(x = ctr)) + geom_density()
+##ctr by brand type
+ggplot(kw, aes(x = ctr, fill = factor(brand))) + geom_density(alpha = 0.3)
+##ctr by location type
+ggplot(kw, aes(x = ctr, fill = factor(location))) + geom_density(alpha = 0.3)
+##ctr by category
+group_by(kw, categoryid)%>% summarise(avg_ctr = mean(ctr))%>%arrange(by = avg_ctr)
+## ctr and num_ads
+ggplot(kw, aes(x = ctr, y = num_ads)) + geom_point(alpha = 0.3) + xlim(0, 1) + ylim(0,2e+05) + geom_smooth(color = 'blue')
+## ctr and transaction 
+ggplot(kw, aes(x = ctr, y = log_trans)) + geom_point(color = 'blue') 
+# ctr and ads quality
+ggplot(kw, aes(x = ctr, y = avg_ad_quality)) + geom_point(alpha = '0.3') + geom_smooth(color = 'blue')
+# ctr and ads competition
+ggplot(kw, aes(x = ctr, y = avg_num_ads)) + geom_point(alpha = '0.3') + geom_smooth(color = 'blue')
+# ctr and number of words
+ggplot(kw, aes(x = ctr, fill = factor(num_word))) + geom_density(alpha = 0.3)
+```
+
+## Discriptive modeling of relationship between CTR and different factors
+The company are concerned with understanding how click-through-rate (ctr) is affected by
+other features in the `keyword.csv` dataset. Regress ctr on `num_ads`, `num_word`, `brand`, `location`,
+`log_trans`, `avg_ad_quality` and/or any other interactions or variables you created from your exploration.
+
+```{r}
+kw$num_ads_sqr = kw$num_ads^2
+fit1 = lm(ctr ~ num_ads + num_ads_sqr + num_word + factor(brand) + factor(location) + log_trans + avg_ad_quality, data = kw)
+summary(fit1)
+
+```
+
+**This regression model can explain 37% variation of ctr.**
+**From the result of the regression model, we can know that num_ads, whether the key word refers to a specific brand or location, the transactional intent and ads quality are significantly related with the ctr.While number of words in the key word is not related with ctr.**
+
+**Keeping other factors the same, one unit increase in the log_trans, the ctr would increase by 1.455e-02 on average. One unit increase in the avg_ad_quality, the ctr would increase by 2.004 on average. num_ads has a curvilinear relationship with ctr, connecting with the graph, when num_ads is below 10000, the reduce in num_ads cannot increase ctr further.Thus, among numerical variables, the quality of the ads has the highest impact on the ctr.**
+
+**For categorical variables, if a key word refers to a brand, the ctr is on average -3.347e-02 lower than key words without refering to brands keeping other factors fixed. If a key word refers to a location, the ctr is on average -3.077e-02 lower than key words without refering to locations keeping other factors fixed.**
+
+
+Add categoryid into the model.
+
+```{r} 
+fit2 = lm(ctr ~ num_ads + num_ads_sqr + num_word + factor(brand) + factor(location) + log_trans + avg_ad_quality + factor(categoryid), data = kw)
+summary(fit2)
+```
+**After adding categoryid, the model can explain 41.2% variation of ctr.**
+**Variables including categoryid excepting num_word is significantly related with ctr.**
+
+**Keeping other factors the same, one unit increase in the log_trans, the ctr would increase by 1.218e-02 on average. One unit increase in the avg_ad_quality, the ctr would increase by 1.960 on average. num_ads has a curvilinear relationship with ctr, connecting with the graph, when num_ads is below 10000, the reduce in num_ads cannot increase ctr further.Thus, among numerical variables, the quality of the ads has the highest impact on the ctr.**
+
+**For categorical variables, if a key word refers to a brand, the ctr is on average -3.370e-02 lower than key words without refering to brands keeping other factors fixed. If a key word refers to a location, the ctr is on average -2.786e-02 lower than key words without refering to locations keeping other factors fixed.**
+
+**the ctr of most categories are significantly higher than the zero category (categoryid = 0). The seventh category has the highest average ctr on average, and category 12 has the second highest ctr holding other factors the same. category 0 and category 3 has the lowest ctr holding other factors fixed.**
+
+## Topic Modeling Using LDA 
+One of the major questions of the company is how a keyword's context (and ambiguity
+thereof) might affect consumer behavior and keyword performance. Latent Dirchlet Allocation is used to discover topics and measure ambiguity.
+
+```{r}
+# Here are the documentation for packages used in this code:
+#https://cran.r-project.org/web/packages/tm/tm.pdf
+
+library(tm)
+#https://cran.r-project.org/web/packages/topicmodels/topicmodels.pdf
+library(topicmodels)
+
+# Use the SnowballC package to do stemming.
+library(SnowballC) 
+```
+
+###Text preprocessing
+```{r} 
+dirname <- file.path(getwd(),"organic_text")
+docs <- Corpus(DirSource(dirname, encoding = "UTF-8"))
+
+# The following steps pre-process the raw text documents. 
+# Remove punctuations and numbers because they are generally uninformative. 
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, removeNumbers)
+
+# Convert all words to lowercase. 
+docs <- tm_map(docs, content_transformer(tolower))
+
+# Remove stopwords such as "a", "the", etc. 
+docs <- tm_map(docs, removeWords, stopwords("english"))
+
+# Use the SnowballC package to do stemming. 
+docs <- tm_map(docs, stemDocument)
+
+# Remove excess white spaces between words. 
+docs <- tm_map(docs, stripWhitespace)
+
+# You can inspect the first document to see what it looks like with 
+#docs[[1]]$content
+
+# Convert all documents to a term frequency matrix. 
+tfm <- DocumentTermMatrix(docs)
+
+# We can check the dimension of this matrix by calling dim() 
+#print(dim(tfm))
+```
+
+### Execute LDA to discover topics 
+```{r} 
+# we run LDA with 20 topics, and use Gibbs sampling as our method for identifying the optimal parameters 
+# Note: this make take some time to run (~10 mins)
+results <- LDA(tfm, k = 20, method = "Gibbs")
+
+# Obtain the top w words (i.e., the w most probable words) for each topic, with the optional requirement that their probability is greater than thresh
+
+#feel free to explore with different values of w and thresh
+w=15
+thresh = 0.003
+Terms <- terms(results, w,thresh) 
+```
+
+**Below are the labels for these topics based on the best guesses from the top words of each topic.**
+**Topic 1: holiday**
+**Topic 2: contact search**
+**Topic 3: fashion and beauty**
+**Topic 4: anecdote** 
+**Topic 5: local information**
+**Topic 6: geographical information**
+**Topic 7: wireless network **
+**Topic 8: business**
+**Topic 9: online social**
+**Topic 10: personal finance**
+**Topic 11: protection**
+**Topic 12: shopping**
+**Topic 13: adob news**
+**Topic 14: disney cruise**
+**Topic 15: personal care**
+**Topic 16: art and design**
+**Topic 17: entertainment**
+**Topic 18: car booking**
+**Topic 19: technology**
+**Topic 20: travel booking**
+<b>
+```{r} 
+# Obtain the most likely t topic assignments for each document. 
+t=1 
+Topic <- topics(results,t)
+
+# Get the posterior probability for each document over each topic 
+posterior <- posterior(results)[[2]]
+
+# look at the posterior topic distribution for the dth document and plot it visually 
+d = 197
+posterior[d,]
+barplot(posterior[d,])
+
+# Examine the main topic for document d 
+Terms[[which.max(posterior[1,])]]
+
+# Compare the keyword of document d to the terms. keywords$query[d]
+```
+
+**I have searched several keywords as below. The topics provided by LDA are as below. Some words have one topic that dominates their posterior probability. The search result for some other words have more than one topics which may create ambiguity.**
+** Most topics assigned to these keywords can describe their meaning.**
+<b>
+** priceline: topic 7, 8**
+** travel: topic 20**
+** banana republic: topic 17**
+<b>
+
+## Measuring keyword contextual ambiguity using entropy
+
+Now that we have run LDA and are able to see the document distributions across topics,
+we want to use this to quantify the ambiguity of each keyword. We are going to use
+[entropy](https://en.wikipedia.org/wiki/Entropy_(information_theory)) to measure the ambiguity of a
+keyword:
+
+\begin{equation*}
+  Entropy(\text{keyword}_i) = - \sum_{t = 1}^{T}{p_{i,t} log(p_{i,t})}
+\end{equation*}
+
+where $p_{i,t}$ is the probability that the organic search text capturing the context of keyword $i$, is
+composed of topic $t$, and $T=20$ in our case of 20 topics. Write a general function to compute entropy,
+given a vector of probabilities. 
+```{r} 
+entropy <- function(probs)
+{ h = 0
+  for (i in 1:length(probs))
+  { if (probs[i] == 0) 
+     {h = h}
+  else
+    {h = h - probs[i]*log2(probs[i])}
+    }
+return (h)
+} 
+```
+
+use this `entropy` function to generate a graph of entropy over the interval $[0,1]$.
+
+```{r}
+entropy(c(0.5,0.5))
+entro_y = rep(NA,10)
+prob = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0)
+for (i in 1:11)
+{entro_y[i] = entropy(c(prob[i],1-prob[i]))
+}
+
+plot(x=prob, y = entro_y, type = "l")
+```
+
+**Entropy refers to disorder or uncertainty of a system. The higher the entropy, the more complex a system is.Here, when a document has the same probability of belonging to each topic which means its topic is ambiguous, the entropy of the document reaches the highest level. Similarly, the more disperse of the posterior probabilities of a document, the more ambiguous it is and the higher entropy.**
+
+
+Create a new column in the keyword data that captures the entropy of each keyword 
+```{r}
+#rank the posterior probability matrix based on the No. of the keywords
+posterior = data.frame(posterior)
+posterior$doc = row.names(posterior)
+library(splitstackshape)
+posterior = cSplit(posterior, "doc", "_")
+posterior = posterior %>% 
+  arrange(by = doc_1)
+
+#create entropy for each keyword in the keyword matrix
+kw$entro = rep(NA, 1000)
+for (i in 1:1000){
+  kw$entro[i] = entropy(posterior[i,1:20])
+}
+kw$entro = as.numeric(unlist(kw$entro))
+
+```
+
+Re-run the regressions from above, adding this new entropy measure as an additional independent variable
+```{r}
+# adding entropy as an independent variable
+fit3 = lm(ctr ~ num_ads + num_ads_sqr + num_word + factor(brand) + factor(location) + log_trans + avg_ad_quality + factor(categoryid) + entro , data = kw)
+summary(fit3)
+
+# adding interactive term of entropy and avg_ad_quality
+fit4 = lm(ctr ~ num_ads + num_ads_sqr + num_word + factor(brand) + factor(location) + log_trans + avg_ad_quality + factor(categoryid) + entro + entro*avg_ad_quality, data = kw)
+summary(fit4)
+
+```
+
+**After adding entropy as an independent variable, although the the R square of the model remain rathertively stable, the coefficient of the entropy was significant at 10% level and was negative indicating one unit increase in the ambiguity of the context (meassured by entropy), the click through rate would reduce by -2.324e-02.**
+
+**When further adding an interactive term of entropy and avg_ad_quality, the R square increased by 1.1% meaning more variation of ctr can be explained. The significant negative coefficient of the interactive term means the higher level of the avg_ad_quality, the smaller effect of ambiguity of the context on the click through rate. Thus , improving the quality of the ads can also reducing the negative impact of ambiguity on click through rate.**
+
+## Final analysis and recommendations
+
+```{r}
+# filter out the data of keyword 'target' and 'walmart'
+target = kw %>%
+  filter(query == 'target')
+
+walmart = kw %>%
+  filter(query == 'walmart')
+
+# compare metrics of 'target' with metrics of competitor 'walmart' and metrics of all keywords
+ggplot(kw, aes(x = ctr)) + geom_density(fill = 'blue', alpha = 0.2) + geom_vline(xintercept = target$ctr, color = 'red',linetype = 2, size = 1) + geom_vline(xintercept = walmart$ctr, color = 'green',linetype = 2, size = 1) + labs(title = "click through rate")
+
+ggplot(kw, aes(x = avg_ad_quality)) + geom_density(fill = 'blue', alpha = 0.2) + geom_vline(xintercept = target$avg_ad_quality, color = 'red',linetype = 2, size = 1) + geom_vline(xintercept = walmart$avg_ad_quality, color = 'green',linetype = 2, size = 1) + labs(title = "avg_ad_quality")
+
+ggplot(kw, aes(x = entro)) + geom_density(fill = 'blue', alpha = 0.2) + geom_vline(xintercept = target$entro, color = 'red', linetype = 2, size = 1) + geom_vline(xintercept = walmart$entro, color = 'green',linetype = 2, size = 1) + labs(title = "entropy")
+```
+
+**As the objective of target team is to improve the click through rate of the keywords it purchased. The click through rate of the keyword "target" was plotted against the total distribution of click through rate of all keywords in the graph "ctr of 'target". It shows, the click through rate of keyword 'target' is at the lower level of the total distribution and lower than click through rate of 'walmart'. **
+
+**As discussed in model fit1, the average quality of ads(avg_ad_quality) has the biggest positive relationship with click through rate. While plotting ads quality of the keyword "Target" is almost at the bottom level of its whole distribution as shown in the graph "avg_ad_quality" above and lower than ads quality of 'walmart'.**
+
+**Meanwhile, the search result of "target" is more ambigious than the average and that of 'walmart'. As discussed in model fit3, ambiguity of context itself and its combined effect with ads quality are the key drivers of low click through rate of 'target' keyword.**
+
+**Based on the findings, target team should try to improve the quality of the ads posted for its keywords to make them more relevant for users. Meanwhile target team should reduce the ambiguity of the search result of its keyword by combining SEO and SEM to improve the ranking of relevant result and beat down unrelevant topics.**
