@@ -25,7 +25,7 @@ bankruptcies, multiple economic recessions, threats of mergers and was now stabl
 
 
 ## Understanding the data
-The original Sun Country data is in .csv file format. We will use R to preprocess the data and
+The original data is in .csv file format. We will use R to preprocess the data and
 analyze it, but first, find below find a data dictionary.
 
 | Field | Description |
@@ -687,88 +687,4 @@ group has a significant possitive relationship with avg_amt in Cluster3, while n
 <br>
 <br>
 
-## Objective Revisisted
-Recall that your task is to analyze the data for potential insight to inform and answer the following questions. You should have been computing results, accompanied by exposistion, in support of answers these questions throughout. However, spend the rest of this document bringing everything you learned together to explicitly address these questions. You should also ensure that you actually discuss and characterize the various segments that you discovered.
 
-1.  How usable is the data you received from the client (Sun Country)? Given the state of the data, what steps would you take to make it usable and useful -- for the initial assigned project and for Sun Country longer term?
-    
-#### The usability of the original data:
-
-+ **Missing data**: the original data contains missing values for UflyRewardsNumber,  UflyMemberStatus etc. Keeping the missing values will make the dataset not valid for some analytic algorithms, or lose information(e.g.NA UflyMemberStatus is actually non-member). 
-
-+ **Inconsistent data**: the original data also contains many faulty data such as Age above 120 and city codes in BookingChannel. Keeping such errors will create many distractions and undermine the quality of analysis.
-
-+ **Granularity**: the original data is transaction data with each row representing a combination of one book, one flight and one traveler. However for most analysis such as this one, obeservations based on trips instead of flights can provide better business insight.** 
-
-+ **Features**: relating to the granularity of the original data, all features in the original data are associated with flights rather than trips thus also contains less business insight.**
-
-+ **Scale**: numerical variables in the original dataset is in different scales which will make result of some analytic algorithms dominated by variables of larger scales and thus become invalid.**
-
-
-#### Steps to make the data usable and useful
-+ **Cleaning missing data**: missing data in UflyRewardsNumber and UflyMemberStatus are replaced with best estimation such as replace NA in UflyRewardsNumber with 0 and missing values in UflyMemberStatus with "non-members".
-
-+ **Cleaning inconsistent data**: faulty data are removed with the entire row or replaced with best estimation.**
-
-+ **Transforming granularity**: the data was transformed from flight based into trip and traveler based.**
-
-+ **Feature generation**: features associated each trip such as origin, destination, Oneway or RoundTrip was generated. other useful features such as Days Booked in Advance and Group Size was also generated.**
-
-+ **Data discretization**: Age was converted into categorical Age_group assuming travellers in each group are similar to each other while different with travellers in other groups. ServiceStartDate of each trip was converted into categorical Seasonality variable assuming trips starting in the same quarter are similar to each other while different with trips in other quarters.** 
-
-+ **Normalization**: numerical variables were normalized using Min-Max method to offset the impact of scale in order to make them usable for many analytic algorithms such as k-means in this project.**
-
-
-2.  Based on what you see in the data, how many different ways can you view the information to
-    paint a picture of different customer segments? Which ways offer Sun Country the most insights? How could the insights be used?
-    
-    
-#### How the insights from visualization can be used:
-+ Since the objective of this project is to find customer segments and understand their respective profiles and flying patterns in order to support product development, digital marketing or other business decisions of Sun Country. Insights from visualization is can be used for:
-+ **providing easy understanding business insights for business managers.**
-+ **serving as an exploratory step and preparing for supervised learnings or other analytical projects.**
-+ **evaluating the performance of the segmentation.**
-    
-<br>    
-
-#### Potential ways to visualize different customer segments:
-    
-+ **Dimensionality**: since my cluster has 11 dimensions in total with 9 categorical variables and 2 continues variables and 5 clusters, the differences among clusters can to be projected in to a plane to visualize. One plane can contain more than 2 dimensions through using colors, shapes or grouping by faceting.      
-    
-+ **Types of graphs**: scatter plot, bar plot for categorical variables, and density plot or histogram for numerical variables can all be used.
-    
-+ **Units for categorical variables**: either counts or proportion of categorical variables in each group can be used as the unit for visualization.
-    
-<br>    
-
-#### The ways that can provide the most insights:
-    
-+ **Dimensionality**: as most variables are categorical, it is not suitable to use scatter plot with colors and shapes to add more dimensions including cluster. Plotting each nominal variables against different clusters may lose some information regarding the relationship among variables but is clear and contains the most information.
-
-+ **Types of graph**: bar plot is the best choice to visualize two categorical data talked above.
-
-+ **Units**: using proportion instead of counts for bar plots of each categorical data against clusters can easily visualize the difference between clusters without the impact of the size of each cluster.The lost information of cluster sizes can be plotted separately.
-    
-
-3.  How would you visualize and present the insights you found for the client? What will you do in order to show Warnken and Vaughan how the insights you derived connect to their business
-    objectives?
-    
-    My visualization and presentation of insights can be found in the visualization part. I tried to convert the data generated by clustering into business insight that may help Warnken and Vaughan get more knowledge connect to their business objective in my communication and provide some suggestions derived from insights to show how those insights can help decision making.    
-    
-
-4.  Discuss: how much power lies in simply understanding and exploring your data? Consider the
-    downside of focusing too much on fancy models.
-    
-    **open-mindedly exploreing, and visualizing data helps analysts to reveal the secrets beneath data and gain fresh, unknown-unknown insights about the data. Using this project as an example, we are able to achieve below tasks through exploration.**
-    
-+ **Data preparation:** through summarization and other exploratory activities, we can detect missing data, anomalies and outliers and clean the data which is essential for any data analysis. Models without data of high quality cannot provide high-quality result.
-
-+ **Uncover underlying structure:** by clusering and visualization of clusters of customers, we can have a better understanding of the structure of customers. It can also serve as a starting point for detailed analysis of each clusters.Without understanding the structure inside data and simply using one model for all observations may generate suspecious result.
-
-+ **Determine optimal parameter settings**: in this project, I plotted elbow curve and silhouette curve to find the optimal number of k for clustering model. Many other models also need analysts to input parameters and the performances of the models highly rely on those parameters.
-
-+ **Extract important variables:** some variables were found not very useful for clustering in this project through exploration. In other cases, fancy models cannot select important variables automatically.
-    
-    
-    
-    
