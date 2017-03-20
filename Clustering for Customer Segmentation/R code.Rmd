@@ -144,7 +144,7 @@ data$BookingChannel[data$BookingChannel!="Outside Booking" &
 data$BookingChannel<-as.factor(data$BookingChannel)
 ```
 
-Remove rows with MarketingAirlineCode code other than “SY”, the airline code for Sun Country.
+Remove rows with MarketingAirlineCode code other than “SY”, the airline code for the company.
 ```{r}
 data$MarketingAirlineCode<-as.character(data$MarketingAirlineCode)
 data%<>%filter(MarketingAirlineCode=="SY")
@@ -312,7 +312,7 @@ sample_data%<>%
 ```
 
 ## Customer Segmentation
-We want to use the data to segment customers of Sun Country Airlines into general categories of people with similar 
+We want to use the data to segment customers of the airlines company into general categories of people with similar 
 flying patterns. The goal is to group the observations in the data into clusters such that every datum in a cluster is
 more similar to other datums in the same cluster than it is to datums in other clusters.
 
@@ -489,7 +489,7 @@ I then visualized the differences between clusters in terms of booking related v
 
 ** More insights among the other Clusters:**
 
-  + **Interestingly, the eldest age group whom are majorly groupped into Cluster4 use SCA website most for booking which can probabliy indicate that the eldest age group is more loyal to Sun Country.**
+  + **Interestingly, the eldest age group whom are majorly groupped into Cluster4 use SCA website most for booking which can probabliy indicate that the eldest age group is more loyal to the airline company.**
 
   + **Cluster1 which mainly contains younger customers (below 34 years old) has the lowest average of days_pre_booked probabliy because younger customers are less planned and prone to spontaneous travel.**
 
@@ -593,7 +593,7 @@ ggplot(customer_data_cluster,aes(x=cluster,y=group_size))+geom_boxplot()
 We could also usign predictive models--e.g., regression (`lm` package) or decision trees (`rpart` package)--inside of each cluster to better understand and explore their differences. 
 
 ### Target variable 
-As the avg_amt is directly associated with the profit of Sun Country, I will use it as the target variable for predictive models.
+As the avg_amt is directly associated with the profit of the airline company, I will use it as the target variable for predictive models.
 
 ### Spliting by clusters
 ```{r}
