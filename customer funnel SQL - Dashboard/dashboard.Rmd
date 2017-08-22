@@ -1,0 +1,256 @@
+---
+title: "Tracking Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    source_code: embed
+    theme: readable
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(plotly)
+library(reshape2)
+```
+
+```{r global, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+#setwd("E:/Data Science Study/User behavior")
+daily_funnel <- read.csv("funnel_report.csv")
+cohort_activation <- read.csv("cohort_analysis_active.csv")
+cohort_conversion <- read.csv("cohort_analysis_conversion.csv")
+
+
+# data preparation
+
+## daily_funnel data set
+###convert date format
+daily_funnel <- daily_funnel%>%
+  mutate(the_date = as.Date(the_date, "%m/%d/%Y"))
+### transform the data to long format for visualization
+daily_funnel_melted <- melt(daily_funnel, id.vars = "the_date")
+colnames(daily_funnel_melted)[2] = "Groups"
+
+## cohort_activation data set
+### calculate months since acquisition for each cohort 
+cohort_activation <- cohort_activation %>% 
+  mutate(month_lapsed = round((as.yearmon(year_month, "%Y-%m") - as.yearmon(cohort, "%Y-%m"))*12,0),
+         cohort = as.yearmon(cohort, "%Y-%m"),
+         active_pct = active_pct * 100)%>%
+  arrange(cohort, month_lapsed)%>%
+  mutate(cohort = factor(cohort))%>%
+  filter(cohort != "-" & year_month != "-")
+
+## cohort_conversion data set
+### calculate months since acquisition for each cohort 
+cohort_conversion <- cohort_conversion %>% 
+  mutate(month_lapsed = round((as.yearmon(year_month, "%Y-%m") - as.yearmon(cohort, "%Y-%m"))*12,0),
+         cohort = as.yearmon(cohort, "%Y-%m"),
+         conversion_rate = conversion_rate * 100,
+         retention_rate = retention_rate * 100)%>%
+  arrange(cohort, month_lapsed)%>%
+  mutate(cohort = factor(cohort))%>%
+  filter(cohort != "-" & year_month != "-")
+```
+
+
+User Activity 
+=====================================  
+
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+Track user activities throughout the time to understand the composition web traffic and how it changes over time.
+
+* New: active today, no event record in history
+* Persistent: active in today and yesterday
+* Returned: active today, inactive yesterday
+* Churned: inactive today, active yesterday
+  
+```{r}
+#input date range
+
+dateRangeInput("dates",
+               "Select the date range:",
+                start = "2014-01-03",
+                end = "2015-03-31",
+                min = "2014-01-03",
+                max = "2015-03-31",
+                format="yyyy/mm/dd")
+
+```
+
+Row 
+-----------------------------------------------------------------------
+
+### Avg Daily New Users
+
+```{r}
+#output mean value for selected dates
+
+renderValueBox(
+  valueBox(value = as.integer(mean(subset(daily_funnel, 
+                                          the_date > input$dates[1] & the_date < input$dates[2])$New)), 
+           color = "#88a618"))
+```
+
+### Avg Daily Persistent Users
+```{r}
+#output mean value for selected dates
+
+renderValueBox(
+  valueBox(value = as.integer(mean(subset(daily_funnel, 
+                                          the_date>input$dates[1] & the_date<input$dates[2])$Persistent)), 
+           color = "#F29F05"))
+```
+
+### Avg Daily Returned Users
+```{r}
+#output mean value for selected dates
+
+renderValueBox(
+  valueBox(value = as.integer(mean(subset(daily_funnel, 
+                                          the_date > input$dates[1] & the_date < input$dates[2])$Returned)), 
+           color = "#438694"))
+```
+
+
+### Avg Daily Churned Users
+```{r}
+renderValueBox(
+  valueBox(value = as.integer(mean(subset(daily_funnel, 
+                                          the_date > input$dates[1] & the_date < input$dates[2])$Churned)), 
+           color = "#D92525"))
+```
+
+
+Row 
+-----------------------------------------------------------------------
+
+### Trend
+```{r}
+#filter input dates
+#seperate number of churned users as it's negative impact
+#display number of churned users as negative values
+
+renderPlot(
+  ggplot() + 
+    geom_area(data = subset(daily_funnel_melted, 
+                            the_date > input$dates[1] & the_date < input$dates [2] & Groups != "Churned"),
+              aes(x = the_date, y = value, fill = Groups)) +
+    geom_area(data = subset(daily_funnel_melted, 
+                            the_date > input$dates[1] & the_date < input$dates [2] & Groups == "Churned")
+                     %>% mutate(value = -value), 
+              aes(x = the_date, y = value, fill = Groups)) +
+    scale_fill_manual(values=c("#D92525", "#F29F05", "#88a618","#438694")) +
+    theme(panel.background = element_blank()) +
+    ylab("Total Number of Users")
+)
+```
+
+
+
+Cohort Analysis
+=====================================  
+Column {.sidebar}
+-----------------------------------------------------------------------
+
+Divide users into cohorts based on their time of acquisition.
+Analyze customer funnel metrics of different cohorts at each month since acquisition to compare cohorts and track status of each cohort. 
+
+
+```{r}
+radioButtons("chart_type", label = "Select chart type:", 
+             choices = c("heat map", "line chart"), selected = "heat map")
+
+conditionalPanel(condition = "input.chart_type == 'line chart'",
+  selectInput("cohorts_selected", label = "Select cohorts:",
+              selected = c("Jan 2014", "Feb 2014","Mar 2014"),
+              multiple = TRUE,
+              choices = cohort_activation$cohort)
+  )
+```
+
+
+Row {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Activation
+
+```{r}
+renderPlot(
+  if (input$chart_type == "line chart") {
+    ggplot(subset(cohort_activation, cohort %in% input$cohorts_selected), 
+           aes(x = month_lapsed, y = active_pct, color = cohort)) + geom_line() + 
+      geom_point() + theme(panel.background = element_blank()) +
+      ggtitle("Percent Active (%)") +
+      xlab("Month since acquisition") +
+      ylab("Percent Active (%)")
+    }
+  else if (input$chart_type == "heat map") {
+    ggplot(cohort_activation, aes(month_lapsed, cohort)) + 
+      geom_tile(aes(fill = active_pct), colour = "white") + 
+      geom_text(aes(label = active_pct)) +
+      scale_fill_gradient(low = "#D92525",high = "#88a618") + 
+      theme(panel.background = element_blank()) +
+      ggtitle("Percent Active (%)") +
+      xlab("Month since acquisition")
+  })
+```
+
+### Conversion
+
+```{r}
+renderPlot(
+  if (input$chart_type == "line chart") {
+    ggplot(subset(cohort_conversion, cohort %in% input$cohorts_selected), 
+           aes(x = month_lapsed, y = conversion_rate, color = cohort)) + 
+      geom_line() + geom_point() + theme(panel.background = element_blank()) +
+      ggtitle("Conversion Rate (%)") +
+      xlab("Month since acquisition") +
+      ylab("Conversion rate (%)")
+    }
+  else if (input$chart_type == "heat map") {
+    ggplot(cohort_conversion, aes(month_lapsed, cohort)) + 
+        geom_tile(aes(fill = conversion_rate), colour = "white") + 
+        geom_text(aes(label = conversion_rate)) +
+        scale_fill_gradient(low = "#D92525",high = "#88a618") + 
+        theme(panel.background = element_blank()) + 
+        ggtitle("Conversion Rate (%)") +
+        xlab("Month since acquisition")} 
+    )
+```
+
+
+### Repeat Purchase
+
+```{r}
+renderPlot(
+    if (input$chart_type == "line chart") {
+      ggplot(subset(cohort_conversion, cohort %in% input$cohorts_selected), 
+             aes(x = month_lapsed, y = retention_rate, color = cohort)) + 
+        geom_line() + geom_point() + 
+        theme(panel.background = element_blank()) + 
+        ggtitle("Repeat Purchase Rate (%)") +
+        xlab("Month since acquisition") +
+        ylab("Repeat Purchase Rate (%)")
+      }
+    else if (input$chart_type == "heat map") {
+      ggplot(cohort_conversion, aes(month_lapsed, cohort)) + 
+        geom_tile(aes(fill = retention_rate), colour = "white") + 
+        geom_text(aes(label = retention_rate)) +
+        scale_fill_gradient(low = "#D92525",high = "green2") +
+        theme(panel.background = element_blank()) +
+        ggtitle("Repeat Purchase Rate (%)") +
+        xlab("Month since acquisition")
+      } 
+      )
+```
+
+
+
