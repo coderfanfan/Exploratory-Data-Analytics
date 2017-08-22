@@ -1,5 +1,6 @@
 /* SQL(PostgreSQL) query to analyze user activity with user log data.
-Data sources: https://www.dataiku.com/learn/guide/tutorials/churn-prediction.html */
+The "event" table which stored user log data is created with data sources: 
+https://www.dataiku.com/learn/guide/tutorials/churn-prediction.html */
 
 
 /*Acquisition & Activation*/
